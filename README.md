@@ -1,2 +1,2 @@
 # ChainedFinance
-A Peer-to-Peer Landing platform via blockchain
+A Peer-to-Peer lending platform via blockchain
