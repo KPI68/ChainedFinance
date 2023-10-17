@@ -1,6 +1,10 @@
 import streamlit as st
 import json
 import requests
+import os
+from web3 import Web3
+from pathlib import Path
+from dotenv import load_dotenv
 
 @st.cache_resource()
 
@@ -13,23 +17,38 @@ def get_CADR():
     return rate_eth
     
 def input_ETH():
-    num_eth = st.number_input("Number of ETH")
-    st.write(f"CAD Equivalent {round(num_eth*get_CADR(),2)}")
-    return num_eth
+    eth = st.number_input("Number of ETH")
+    st.write(f"CAD Equivalent {round(eth*get_CADR(),2)}")
+    return eth
 
 def deposit():    
     num_eth = input_ETH()
     int_rate = st.slider("Propose Annual Interest Rate in unit of 0.001", max_value=300)
     st.write(f"{int_rate*0.1}%")
+    return num_eth
 
-def submit_deposit():
+def submit_deposit(eth):
     st.markdown("## deposit to contract, update Interest contract")
+    tx_hash = acc_contract.functions.deposit().transact(
+        {   "from": msg_sender, 
+            "value": w3.toWei(eth,'ether'), 
+            "gas":100000,
+            'gasPrice': w3.toWei('25', 'gwei') })
+    receipt = w3.eth.waitForTransactionReceipt(tx_hash)
+    st.write(receipt)
 
 def withdraw():
-    num_eth = input_ETH()
+    return input_ETH()
 
-def submit_withdraw():
+def submit_withdraw(num_eth):
     st.markdown("## contract.transfer")
+    tx_hash = acc_contract.functions.withdraw(w3.toWei(num_eth,'ether')).transact(
+        {   "from": msg_sender,
+            "gas":100000,
+            'gasPrice': w3.toWei('25', 'gwei') 
+        })
+    receipt = w3.eth.waitForTransactionReceipt(tx_hash)
+    st.write(receipt)
 
 def apply_loan():
     st.markdown("## Input info ERC721Full")
@@ -82,9 +101,21 @@ funcs = {   "Deposit": { "input": deposit, "submit": submit_deposit },
 st.image("Images/fish.png")
 st.markdown("# Fin Fishing")
 
+load_dotenv()
+
+# connect to Ganache
+w3 =  Web3(Web3.HTTPProvider(os.getenv("WEB3_PROVIDER_URI")))
+    
+with open(Path('./contracts/compiled/acc_abi.json')) as f:
+    acc_abi = json.load(f)
+
+acc_contract_address = os.getenv("ACC_CONTRACT_ADDRESS")
+acc_contract = w3.eth.contract(address=acc_contract_address, abi=acc_abi)    
+
+
 msg_sender = st.text_input("Ethereum Account")
 
 func_selected = st.selectbox("Select a function:", funcs.keys() )
-funcs[func_selected]["input"]()
+eth_num = funcs[func_selected]["input"]()
 if st.button("Submit"):
-    funcs[func_selected]["submit"]()
+    funcs[func_selected]["submit"](eth_num)
