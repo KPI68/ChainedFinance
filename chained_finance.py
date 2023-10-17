@@ -42,6 +42,7 @@ def withdraw():
 
 def submit_withdraw(num_eth):
     st.markdown("## contract.transfer")
+    print(num_eth)
     tx_hash = acc_contract.functions.withdraw(w3.toWei(num_eth,'ether')).transact(
         {   "from": msg_sender,
             "gas":100000,
@@ -49,6 +50,14 @@ def submit_withdraw(num_eth):
         })
     receipt = w3.eth.waitForTransactionReceipt(tx_hash)
     st.write(receipt)
+
+def check_balance():
+    bal_wei = acc_contract.functions.current_balance().call(
+        {   "from": msg_sender, 
+            "gas": 100000
+        }
+    )
+    st.write(f"{w3.fromWei(bal_wei,"ether")} ETH")
 
 def apply_loan():
     st.markdown("## Input info ERC721Full")
@@ -91,6 +100,7 @@ def submit_collector():
 
 funcs = {   "Deposit": { "input": deposit, "submit": submit_deposit },
             "Withdraw": { "input": withdraw, "submit": submit_withdraw },
+            "Check Balance": { "input": check_balance, "submit": None },
             "Apply Loan": { "input": apply_loan, "submit": submit_apply_loan },
             "Repay Loan": { "input": repay_loan, "submit": submit_repay_loan },
             "Renew Loan": { "input": renew_loan, "submit": submit_renew_loan },
@@ -111,7 +121,8 @@ with open(Path('./contracts/compiled/acc_abi.json')) as f:
 
 acc_contract_address = os.getenv("ACC_CONTRACT_ADDRESS")
 acc_contract = w3.eth.contract(address=acc_contract_address, abi=acc_abi)    
-
+st.markdown(f"## Current System Total {w3.fromWei(w3.eth.get_balance(acc_contract_address),'ether')} 
+            ETH")
 
 msg_sender = st.text_input("Ethereum Account")
 
