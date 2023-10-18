@@ -21,6 +21,17 @@ def input_ETH():
     st.write(f"CAD Equivalent {round(eth*get_CADR(),2)}")
     return eth
 
+def do_nothing():
+    pass
+
+def get_loan_amount():
+    loan_wei = acc_contract.functions.current_loan().call(
+        {   "from": msg_sender, 
+            "gas": 100000
+        }
+    )
+    return w3.fromWei(loan_wei,'ether')
+
 def deposit():    
     num_eth = input_ETH()
     int_rate = st.slider("Propose Annual Interest Rate in unit of 0.001", max_value=300)
@@ -42,7 +53,6 @@ def withdraw():
 
 def submit_withdraw(num_eth):
     st.markdown("## contract.transfer")
-    print(num_eth)
     tx_hash = acc_contract.functions.withdraw(w3.toWei(num_eth,'ether')).transact(
         {   "from": msg_sender,
             "gas":100000,
@@ -52,29 +62,50 @@ def submit_withdraw(num_eth):
     st.write(receipt)
 
 def check_balance():
-    bal_wei = acc_contract.functions.current_balance().call(
+    bal_wei = acc_contract.functions.current_cash().call(
         {   "from": msg_sender, 
             "gas": 100000
         }
     )
-    st.write(f"{w3.fromWei(bal_wei,"ether")} ETH")
+    st.write(f"{w3.fromWei(bal_wei,'ether')} ETH")
 
 def apply_loan():
     st.markdown("## Input info ERC721Full")
     purpose = st.selectbox("Purpose of loan", ["Grocery", "Bet", "Drug", "Rent"])
     allowance = input_ETH()
     tenor = st.slider("Select tenor in days", min_value=1, max_value=365)
+    return allowance
 
-def submit_apply_loan():
+def submit_apply_loan(allowance):
     st.markdown("## Run AI grant Y/N")
     st.markdown("## Withdraw under allowance + Reg Loan ERC721Full")
+    try:
+        tx_hash = acc_contract.functions.cash_loan(w3.toWei(allowance,'ether')).transact(
+            { "from": msg_sender,
+              "gas":100000,
+              'gasPrice': w3.toWei('25', 'gwei') 
+            })
+    except ValueError:
+        st.error()
+        return
+    receipt = w3.eth.waitForTransactionReceipt(tx_hash)
+    st.write(receipt) 
+    st.write(f"Loan amount: {get_loan_amount()} ETH")
 
 def repay_loan():
-    st.markdown("## Repay loan")
-    num_eth = input_ETH()
+    st.markdown(f"## Repay loan - Amount: {get_loan_amount()} ETH")
+    return input_ETH()
 
-def submit_repay_loan():
+
+def submit_repay_loan(eth):
     st.markdown("## deposit + update Loan ERC721Full + update Interest Contract")
+    tx_hash = acc_contract.functions.repay_loan().transact(
+        {   "from": msg_sender, 
+            "value": w3.toWei(eth,'ether'), 
+            "gas":100000,
+            'gasPrice': w3.toWei('25', 'gwei') })
+    receipt = w3.eth.waitForTransactionReceipt(tx_hash)
+    st.write(receipt)
 
 def renew_loan():
     st.markdown("## Call up from ERC721Full")
@@ -100,7 +131,7 @@ def submit_collector():
 
 funcs = {   "Deposit": { "input": deposit, "submit": submit_deposit },
             "Withdraw": { "input": withdraw, "submit": submit_withdraw },
-            "Check Balance": { "input": check_balance, "submit": None },
+            "Check Balance": { "input": check_balance, "submit": do_nothing },
             "Apply Loan": { "input": apply_loan, "submit": submit_apply_loan },
             "Repay Loan": { "input": repay_loan, "submit": submit_repay_loan },
             "Renew Loan": { "input": renew_loan, "submit": submit_renew_loan },
@@ -121,10 +152,10 @@ with open(Path('./contracts/compiled/acc_abi.json')) as f:
 
 acc_contract_address = os.getenv("ACC_CONTRACT_ADDRESS")
 acc_contract = w3.eth.contract(address=acc_contract_address, abi=acc_abi)    
-st.markdown(f"## Current System Total {w3.fromWei(w3.eth.get_balance(acc_contract_address),'ether')} 
-            ETH")
+st.markdown(f"## Current System Total {w3.fromWei(w3.eth.get_balance(acc_contract_address),'ether')} ETH")
 
-msg_sender = st.text_input("Ethereum Account")
+#msg_sender = st.text_input("Ethereum Account")
+msg_sender = st.selectbox("Account Address:", w3.eth.accounts)
 
 func_selected = st.selectbox("Select a function:", funcs.keys() )
 eth_num = funcs[func_selected]["input"]()
