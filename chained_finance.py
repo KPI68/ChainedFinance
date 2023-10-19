@@ -1,12 +1,14 @@
 import streamlit as st
 import json
+import ast
 import requests
 import os
 from web3 import Web3
 from pathlib import Path
 from dotenv import load_dotenv
+from disclaimers import deposit_rules
 
-@st.cache_resource()
+#@st.cache_resource()
 
 def get_CADR():
     # get current ETH rate from coinbase
@@ -16,8 +18,8 @@ def get_CADR():
     rate_eth = float(rate_json['data']['amount'])
     return rate_eth
     
-def input_ETH():
-    eth = st.number_input("Number of ETH")
+def input_ETH(max_value=None):
+    eth = st.number_input("Number of ETH", max_value=max_value)
     st.write(f"CAD Equivalent {round(eth*get_CADR(),2)}")
     return eth
 
@@ -33,6 +35,7 @@ def get_loan_amount():
     return w3.fromWei(loan_wei,'ether')
 
 def deposit():    
+    deposit_rules()
     num_eth = input_ETH()
     int_rate = st.slider("Propose Annual Interest Rate in unit of 0.001", max_value=300)
     st.write(f"{int_rate*0.1}%")
@@ -49,25 +52,32 @@ def submit_deposit(eth):
     st.write(receipt)
 
 def withdraw():
-    return input_ETH()
-
-def submit_withdraw(num_eth):
-    st.markdown("## contract.transfer")
-    tx_hash = acc_contract.functions.withdraw(w3.toWei(num_eth,'ether')).transact(
-        {   "from": msg_sender,
-            "gas":100000,
-            'gasPrice': w3.toWei('25', 'gwei') 
-        })
-    receipt = w3.eth.waitForTransactionReceipt(tx_hash)
-    st.write(receipt)
-
-def check_balance():
     bal_wei = acc_contract.functions.current_cash().call(
         {   "from": msg_sender, 
             "gas": 100000
         }
     )
-    st.write(f"{w3.fromWei(bal_wei,'ether')} ETH")
+    bal_eth = w3.fromWei(bal_wei,'ether')
+    st.write(f"Your current balance is {bal_eth} ETH")
+    return input_ETH(float(bal_eth))
+
+def submit_withdraw(num_eth):
+    if num_eth == 0:
+        return
+    
+    st.markdown("## contract.transfer")
+    try:
+        tx_hash = acc_contract.functions.withdraw(w3.toWei(num_eth,'ether')).transact(
+            {  "from": msg_sender,
+               "gas":100000,
+               'gasPrice': w3.toWei('25', 'gwei') 
+            })
+    except ValueError as e:
+        st.write(ast.literal_eval(str(e))['message'])
+        return
+    
+    receipt = w3.eth.waitForTransactionReceipt(tx_hash)
+    st.write(receipt)
 
 def apply_loan():
     st.markdown("## Input info ERC721Full")
@@ -85,25 +95,29 @@ def submit_apply_loan(allowance):
               "gas":100000,
               'gasPrice': w3.toWei('25', 'gwei') 
             })
-    except ValueError:
-        st.error()
+    except ValueError as e:
+        st.write(ast.literal_eval(str(e))['message'])
         return
     receipt = w3.eth.waitForTransactionReceipt(tx_hash)
     st.write(receipt) 
     st.write(f"Loan amount: {get_loan_amount()} ETH")
 
 def repay_loan():
-    st.markdown(f"## Repay loan - Amount: {get_loan_amount()} ETH")
+    st.markdown(f"## Repay - Loan Amount: {get_loan_amount()} ETH")
     return input_ETH()
 
 
 def submit_repay_loan(eth):
     st.markdown("## deposit + update Loan ERC721Full + update Interest Contract")
-    tx_hash = acc_contract.functions.repay_loan().transact(
-        {   "from": msg_sender, 
-            "value": w3.toWei(eth,'ether'), 
-            "gas":100000,
-            'gasPrice': w3.toWei('25', 'gwei') })
+    try:
+        tx_hash = acc_contract.functions.repay_loan().transact(
+            {   "from": msg_sender, 
+                "value": w3.toWei(eth,'ether'), 
+                "gas":100000,
+                'gasPrice': w3.toWei('25', 'gwei') })
+    except ValueError as e:
+        st.write(ast.literal_eval(str(e))['message'])
+        return
     receipt = w3.eth.waitForTransactionReceipt(tx_hash)
     st.write(receipt)
 
@@ -131,7 +145,6 @@ def submit_collector():
 
 funcs = {   "Deposit": { "input": deposit, "submit": submit_deposit },
             "Withdraw": { "input": withdraw, "submit": submit_withdraw },
-            "Check Balance": { "input": check_balance, "submit": do_nothing },
             "Apply Loan": { "input": apply_loan, "submit": submit_apply_loan },
             "Repay Loan": { "input": repay_loan, "submit": submit_repay_loan },
             "Renew Loan": { "input": renew_loan, "submit": submit_renew_loan },
@@ -152,12 +165,12 @@ with open(Path('./contracts/compiled/acc_abi.json')) as f:
 
 acc_contract_address = os.getenv("ACC_CONTRACT_ADDRESS")
 acc_contract = w3.eth.contract(address=acc_contract_address, abi=acc_abi)    
-st.markdown(f"## Current System Total {w3.fromWei(w3.eth.get_balance(acc_contract_address),'ether')} ETH")
+st.markdown(f"## Current System Total Cash {w3.fromWei(w3.eth.get_balance(acc_contract_address),'ether')} ETH")
 
 #msg_sender = st.text_input("Ethereum Account")
 msg_sender = st.selectbox("Account Address:", w3.eth.accounts)
 
 func_selected = st.selectbox("Select a function:", funcs.keys() )
 eth_num = funcs[func_selected]["input"]()
-if st.button("Submit"):
+if funcs[func_selected]["submit"] != None and st.button("Submit"):
     funcs[func_selected]["submit"](eth_num)
