@@ -8,5 +8,3 @@ def deposit_rules():
     st.markdown("#### Interest can be withdrawn in the lesser of the two amounts:")
     st.markdown("* Your deposited aggregated balance times our rate")
     st.markdown("* The system total available interest paid by debtors")
-
-#deposit_rules()
