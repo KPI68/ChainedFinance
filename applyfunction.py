@@ -17,8 +17,7 @@ def pin_loan_data(account_address, loan_details, file):
     return json_ipfs_hash, token_json
 
 def loan_appraisal(account_address, loan_amount_cad, loan_term_days):
- 
-    #gb_model = joblib.load('gb_model.pkl')
+    gb_model = joblib.load('gb_model.pkl')
 
     st.title('Loan Application and Credit Worthiness Prediction')
 
@@ -73,13 +72,12 @@ def loan_appraisal(account_address, loan_amount_cad, loan_term_days):
                                    credit_score, loan_amount_cad, loan_term_days, open_accounts, outstanding_debt, dti])
 
         # predictions using gb_model.
-        #gb_prediction = gb_model.predict(input_features.reshape(1, -1))
-        gb_prediction = [1]
+        gb_prediction = gb_model.predict(input_features.reshape(1, -1))
+        #gb_prediction = [1]
 
         if gb_prediction[0] == 1:
             st.write("Loan Approved")
             dob_str = str(dob)
-            today_str = str(today)
             loan_details = {
                 'first_name': first_name,
                 'last_name': last_name,
@@ -93,9 +91,7 @@ def loan_appraisal(account_address, loan_amount_cad, loan_term_days):
                 'education_level': education_level,
                 'loan_purpose': loan_purpose,
                 'credit_score': credit_score,
-                'loan_amount_cad': loan_amount_cad,
-                'tenor': loan_term_days,
-                'start_date': today_str
+                'loan_amount_cad': loan_amount_cad
             }
             try:
                 loan_ipfs_hash, token_json = pin_loan_data(account_address, loan_details, file)
@@ -109,4 +105,33 @@ def loan_appraisal(account_address, loan_amount_cad, loan_term_days):
             st.write("Loan Declined")
             return None
 
+def loan_renewal(details, tenor):
+    gb_model = joblib.load('gb_model.pkl')
+    #display details for renewal
+    if details != None:
+        age = details['age']
+        income = details['income']
+        employment_years = details['employment_years']
+        education_level = details['education_level']
+        education_mapping = {'High School': 1, 'Diploma': 2, 'Bachelor': 3, 'Master': 4, 'PhD': 5}
+        education_level_num = education_mapping[education_level]
+        loan_purpose = details['loan_purpose']
+        loan_purpose_mapping = {'Home': 1, 'Auto': 2, 'Education': 3, 'Personal': 4}
+        loan_purpose_encoded = loan_purpose_mapping[loan_purpose]
+        credit_score = details['credit_score']
+        open_accounts = details['open_accounts']
+        outstanding_debt = details['outstanding_debt']
+        dti = details['dti']
+        loan_amount_cad = details['loan_amount_cad']
+        loan_term_days = tenor
+        input_features = np.array([age, income, employment_years, education_level_num, loan_purpose_encoded,
+                                   credit_score, loan_amount_cad, loan_term_days, open_accounts, outstanding_debt, dti])
+        # predictions using gb_model.
+        gb_prediction = gb_model.predict(input_features.reshape(1, -1))
+        if gb_prediction[0] == 1:
+            st.write("Renewal Approved")
+            return True
+        else:
+            st.write("Renewal Declined")
+            return False
 
