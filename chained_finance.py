@@ -68,15 +68,8 @@ def get_loan_amount():
     )
     return w3.fromWei(loan_wei,'ether')
 
-def get_loan_tenor(loan_id):
-    return loan_contract.functions.getLoanTenor(loan_id).call()
-
-def get_loan_start_date(loan_id):
-    start_date_str = loan_contract.functions.getStartDate(loan_id).call()
-    return datetime.date.fromisoformat(start_date_str)
-
 def get_loan_details(loan_id):
-    loan_uri = loan_contract.functions.getLoanDetails(loan_id).call()
+    start_date_str, tenor, loan_uri = loan_contract.functions.getLoanDetails(loan_id).call()
     ipfs_hash = loan_uri[7:]
     st.markdown(f"[IPFS Gateway Link for Loan detail](https://ipfs.io/ipfs/{ipfs_hash})")
     response = urlopen(f"https://ipfs.io/ipfs/{ipfs_hash}") 
@@ -86,7 +79,7 @@ def get_loan_details(loan_id):
         return None
     st.write(data_json)
     st.image(f'https://ipfs.io/ipfs/{loan_details["image"]}')
-    return dict(data_json)
+    return start_date_str, tenor, loan_details
 
 def deposit():    
     deposit_rules()
@@ -139,12 +132,12 @@ def apply_loan():
     allowance_in_cad = round(allowance*get_CADR(),2)
     tenor = st.slider("Select tenor in days", min_value=1, max_value=366)
     try:
-        loan_details, loan_uri = loan_appraisal(msg_sender, allowance_in_cad, tenor)
+        loan_uri = loan_appraisal(msg_sender, allowance_in_cad, tenor)
     except TypeError:
-        loan_details = None
+        loan_uri = None
 
-    if loan_details != None:
-        register_loan(allowance, loan_uri)
+    if loan_uri != None:
+        register_loan(allowance, loan_uri, tenor)
 
 def repay_loan():
     loan_amount = get_loan_amount()
@@ -153,12 +146,12 @@ def repay_loan():
         return
     
     loan_id = acc_contract.functions.get_loan_id().call( {"from": msg_sender} )
-    loan_details = get_loan_details(loan_id)
-    if loan_details == None:
+    start_date_str, tenor, loan_details = get_loan_details(loan_id)
+    if  start_date_str == None:
         st.write("Account has no loan")
         return
     
-    start_date = get_loan_start_date(loan_id)
+    start_date = datetime.date.fromisoformat(start_date_str)
     passed_days = (datetime.date.today() - start_date).days
     interest_rate = acc_contract.functions.get_rate().call()
 
@@ -192,21 +185,21 @@ def repay_loan():
 
 def renew_loan():
     loan_id = acc_contract.functions.get_loan_id().call( {"from": msg_sender} )
-    loan_details = get_loan_details(loan_id)
-    if loan_details == None:
+    start_date_str, tenor, loan_details = get_loan_details(loan_id)
+    if start_date_str == None:
         st.write("Account has no loan")
         return
 
     st.markdown(f"## Renew - Loan Amount: {get_loan_amount()} ETH")
     allowance = input_ETH()
     allowance_in_cad = round(allowance*get_CADR(),2)
-    loan_details["detail"]["allowance_in_cad"] = allowance_in_cad
     tenor = st.slider("Select tenor in days", min_value=1, max_value=366)
-    if not loan_renewal(loan_details, tenor):
+    loan_uri = loan_renewal(msg_sender, allowance_in_cad, tenor, 
+                            loan_details['details'], loan_details["image"])
+    if loan_uri == None:
         return
     
-    tx_hash = loan_contract.functions.setStartDate(str(datetime.date.today())).transact({'from': msg_sender, 'gas': 1000000})
-    tx_hash = loan_contract.functions.setTenor(tenor).transact({'from': msg_sender, 'gas': 1000000})
+    tx_hash = loan_contract.functions.updateLoan(loan_id, str(datetime.date.today()), tenor, loan_uri).transact({'from': msg_sender, 'gas': 1000000})
 
 def request_interest():
     st.markdown(f"## Earned Interest: {acc_contract.functions.current_interest().call()}")
