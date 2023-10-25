@@ -19,7 +19,7 @@ contract Money {
 
     function deposit() public payable {
         uint dys = ( block.timestamp - accounts[msg.sender].asat) / 60 / 60 / 24;
-        accounts[msg.sender].aggregated = accounts[msg.sender].snapshot*dys;
+        accounts[msg.sender].aggregated += accounts[msg.sender].snapshot*dys;
         accounts[msg.sender].snapshot += msg.value;
         accounts[msg.sender].asat = block.timestamp;
     }
@@ -29,7 +29,7 @@ contract Money {
         uint dys = ( block.timestamp - accounts[msg.sender].asat) / 60 / 60 / 24;
         require( address(this).balance> amount, "Not enough cash in system");
         require( accounts[recipient].snapshot> amount, "Not enough cash in account");
-        accounts[recipient].aggregated = accounts[recipient].snapshot*dys;
+        accounts[recipient].aggregated += accounts[recipient].snapshot*dys;
         accounts[recipient].snapshot -= amount ;
         accounts[msg.sender].asat = block.timestamp;
         recipient.transfer(amount);
@@ -55,9 +55,8 @@ contract Money {
 
     function cash_interest(uint amount) public payable {
         address payable recipient = msg.sender;
-        uint earned_interest = accounts[msg.sender].aggregated * current_rate / 365000;
         require(total_interest> amount, "Not enough interest received in system");
-        require(earned_interest> amount, "Account did not earn enough interest");
+        accounts[recipient].aggregated = 0;
         total_interest -= amount;
         recipient.transfer(amount);
     }
@@ -75,7 +74,9 @@ contract Money {
     }
 
     function current_interest() public view returns(uint) {
-        return accounts[msg.sender].aggregated * current_rate / 365000;
+        uint dys = ( block.timestamp - accounts[msg.sender].asat) / 60 / 60 / 24;
+        uint aggregated_to_day = accounts[msg.sender].aggregated + accounts[msg.sender].snapshot*dys;
+        return aggregated_to_day * current_rate / 365000;
     }
 
     function get_total_interest() public view returns(uint) {
