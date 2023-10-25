@@ -13,7 +13,18 @@ import datetime
 
 #@st.cache_resource()
 
-def register_loan(loan_amount_eth, loan_uri, tenor):
+def register_loan(loan_uri, tenor):
+    tx_hash = loan_contract.functions.registerLoan(str(datetime.date.today()), tenor,
+        loan_uri).transact({'from': msg_sender, 'gas': 1000000})
+    loan_id = loan_contract.functions.totalSupply().call() - 1
+    
+    tx_hash = acc_contract.functions.set_loan_id(loan_id).transact(
+        {   "from": msg_sender}
+    )
+
+    st.write(f"Loan amount: {get_loan_amount()} ETH")
+
+def cash_loan(loan_amount_eth):
     try:
         tx_hash = acc_contract.functions.cash_loan(w3.toWei(loan_amount_eth,'ether')).transact(
             {   "from": msg_sender,
@@ -22,12 +33,13 @@ def register_loan(loan_amount_eth, loan_uri, tenor):
             })
     except ValueError as e:
         st.write(ast.literal_eval(str(e))['message'])
-        return
+        return False
+    return True
     #receipt = w3.eth.waitForTransactionReceipt(tx_hash)
 
-    tx_hash = loan_contract.functions.registerLoan(str(datetime.date.today()), tenor,
+def update_loan(loan_id, tenor, loan_uri):
+    tx_hash = loan_contract.functions.updateLoan(loan_id, str(datetime.date.today()), tenor,
         loan_uri).transact({'from': msg_sender, 'gas': 1000000})
-    loan_id = loan_contract.functions.totalSupply().call() - 1
     
     tx_hash = acc_contract.functions.set_loan_id(loan_id).transact(
         {   "from": msg_sender}
@@ -128,6 +140,11 @@ def withdraw():
         st.write(receipt)
 
 def apply_loan():
+    loan_amount = get_loan_amount()
+    if loan_amount != 0:
+        st.write("Account already has loan. Go to Renew function.")
+        return
+    
     allowance = input_ETH()
     allowance_in_cad = round(allowance*get_CADR(),2)
     tenor = st.slider("Select tenor in days", min_value=1, max_value=366)
@@ -137,7 +154,8 @@ def apply_loan():
         loan_uri = None
 
     if loan_uri != None:
-        register_loan(allowance, loan_uri, tenor)
+        if cash_loan(allowance):
+            register_loan(loan_uri, tenor)
 
 def repay_loan():
     loan_amount = get_loan_amount()
@@ -190,8 +208,12 @@ def renew_loan():
         st.write("Account has no loan")
         return
 
-    st.markdown(f"## Renew - Loan Amount: {get_loan_amount()} ETH")
-    allowance = input_ETH()
+    old_amount = get_loan_amount()
+    st.markdown(f"## Renew - Loan Amount: {old_amount} ETH")
+    st.markdown(f"## Tenor: {tenor} days")
+    st.markdown(f"## Start Date: {start_date_str}")
+
+    allowance = int(input_ETH())
     allowance_in_cad = round(allowance*get_CADR(),2)
     tenor = st.slider("Select tenor in days", min_value=1, max_value=366)
     loan_uri = loan_renewal(msg_sender, allowance_in_cad, tenor, 
@@ -200,7 +222,35 @@ def renew_loan():
         return
     
     tx_hash = loan_contract.functions.updateLoan(loan_id, str(datetime.date.today()), tenor, loan_uri).transact({'from': msg_sender, 'gas': 1000000})
+    
+    start_date = datetime.date.fromisoformat(start_date_str)
+    passed_days = (datetime.date.today() - start_date).days
+    interest_rate = acc_contract.functions.get_rate().call()
 
+    passed_days = 1
+    if allowance >= old_amount:
+        total_interest = old_amount * interest_rate * passed_days / 365000
+    else:
+        total_interest = (old_amount - allowance) * interest_rate * passed_days / 365000
+
+    if allowance > old_amount and not cash_loan(allowance-old_amount):
+        return
+    
+    st.markdown(f"borrowed for: {passed_days} days")
+    st.markdown(f"at annual rate: {interest_rate / 10}%")
+    st.markdown(f"Total Interest to pay: {total_interest} ETH")
+
+    update_loan(loan_id, tenor, loan_uri)
+    if total_interest > 0:
+        tx_hash = acc_contract.functions.repay_interest().transact(
+        {   "from": msg_sender, 
+            "value": w3.toWei(total_interest,'ether'), 
+            "gas":100000 
+        })
+        receipt = w3.eth.waitForTransactionReceipt(tx_hash)
+        st.write(receipt)
+        
+    
 def request_interest():
     st.markdown(f"## Earned Interest: {acc_contract.functions.current_interest().call()}")
     eth = input_ETH()
