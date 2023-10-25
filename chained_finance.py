@@ -252,11 +252,11 @@ def renew_loan():
         
     
 def request_interest():
-    st.markdown(f"## Earned Interest: {acc_contract.functions.current_interest().call()}")
-    eth = input_ETH()
+    earned_interest = acc_contract.functions.current_interest().call()
+    st.markdown(f"## Earned Interest: {earned_interest}")
     if st.button('Submit'):
         try:
-            tx_hash = acc_contract.functions.cash_interest(w3.toWei(eth,'ether')).transact(
+            tx_hash = acc_contract.functions.cash_interest(w3.toWei(earned_interest,'ether')).transact(
                 { "from": msg_sender,
                 "gas":100000})
         except ValueError as e:
