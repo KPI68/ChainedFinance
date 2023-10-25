@@ -143,12 +143,12 @@ def loan_renewal(account_address, loan_amount_cad, loan_term_days, details, img_
     # Encode 'Education Level'
     education_level = st.selectbox('Education Level', 
                                    ['High School', 'Diploma', 'Bachelor', 'Master', 'PhD'],
-                                   index=education_mapping[details['education_level']])
+                                   index=education_mapping[details['education_level']]-1)
 
     # Encode 'Loan Purpose'
     loan_purpose = st.selectbox('Loan Purpose', 
                                 ['Home', 'Auto', 'Education', 'Personal'],
-                                index=loan_purpose_mapping[details['loan_purpose']])
+                                index=loan_purpose_mapping[details['loan_purpose']]-1)
 
     credit_score = st.number_input('Credit Score', min_value=300, max_value=900, value=details['credit_score'])
     open_accounts = st.number_input('Number of Open Accounts', min_value=0, value=details['open_accounts'])

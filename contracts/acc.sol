@@ -37,9 +37,8 @@ contract Money {
 
     function cash_loan(uint amount) public payable {
         address payable recipient = msg.sender ;
-        require(accounts[recipient].loan== 0, "Loan exists");
         require(address(this).balance> amount, "Not enough cash in system");
-        accounts[recipient].loan = amount ;
+        accounts[recipient].loan += amount ;
         total_loan += amount;
         recipient.transfer(amount);
     }
