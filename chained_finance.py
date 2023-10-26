@@ -22,7 +22,7 @@ def register_loan(loan_uri, tenor):
         {   "from": msg_sender}
     )
 
-    st.write(f"Loan amount: {get_loan_amount()} ETH")
+    st.markdown(f"## Loan amount: {get_loan_amount()} ETH")
 
 def cash_loan(loan_amount_eth):
     try:
@@ -32,7 +32,7 @@ def cash_loan(loan_amount_eth):
                 'gasPrice': w3.toWei('25', 'gwei') 
             })
     except ValueError as e:
-        st.write(ast.literal_eval(str(e))['message'])
+        st.error(ast.literal_eval(str(e))['message'], icon="🚨")
         return False
     return True
     #receipt = w3.eth.waitForTransactionReceipt(tx_hash)
@@ -45,16 +45,15 @@ def update_loan(loan_id, tenor, loan_uri):
         {   "from": msg_sender}
     )
 
-    st.write(f"Loan amount: {get_loan_amount()} ETH")
+    st.markdown(f"## Loan amount: {get_loan_amount()} ETH")
 
 def expose_delinquents():
     # Fetch total number of properties/tokens
     total_loans = loan_contract.functions.totalSupply().call()
     loan_ids = list(range(total_loans))
 
-    st.markdown("## Display loan id:")
     loan_id = st.selectbox("Choose a Loan ID", loan_ids)
-    get_loan_details(loan_id)
+    get_loan_details(loan_id, for_delinquent=True)
 
 def get_CADR():
     # get current ETH rate from coinbase
@@ -80,18 +79,27 @@ def get_loan_amount():
     )
     return w3.fromWei(loan_wei,'ether')
 
-def get_loan_details(loan_id):
+def get_loan_details(loan_id, for_delinquent=False):
     start_date_str, tenor, loan_uri = loan_contract.functions.getLoanDetails(loan_id).call()
+    if for_delinquent:
+        start_date = datetime.date.fromisoformat(start_date_str)
+        passed_days = (datetime.date.today() - start_date).days
+        if passed_days < tenor:
+            st.error("Loan not pastdue", icon="🤖")
+            return
+    return start_date_str, tenor, loan_uri
+
+def display_loan_details(loan_uri): 
     ipfs_hash = loan_uri[7:]
-    st.markdown(f"[IPFS Gateway Link for Loan detail](https://ipfs.io/ipfs/{ipfs_hash})")
+    st.sidebar.markdown(f"[IPFS Gateway Link for Loan detail](https://ipfs.io/ipfs/{ipfs_hash})")
     response = urlopen(f"https://ipfs.io/ipfs/{ipfs_hash}") 
     data_json = json.loads(response.read()) 
     loan_details = dict(data_json)
     if loan_details["name"] != msg_sender:
         return None
-    st.write(data_json)
-    st.image(f'https://ipfs.io/ipfs/{loan_details["image"]}')
-    return start_date_str, tenor, loan_details
+    st.sidebar.write(data_json)
+    st.sidebar.image(f'https://ipfs.io/ipfs/{loan_details["image"]}')
+    return loan_details
 
 def deposit():    
     deposit_rules()
@@ -107,7 +115,7 @@ def deposit():
                 'gasPrice': w3.toWei('25', 'gwei') })
         receipt = w3.eth.waitForTransactionReceipt(tx_hash)
         st.write(receipt)
-        st.write(int(w3.fromWei(w3.eth.get_balance(acc_contract_address),'ether')))
+        st.markdown(f"## {float(w3.fromWei(w3.eth.get_balance(acc_contract_address),'ether'))}")
         acc_contract.functions.set_rate(int_rate).transact(
             {   "from": msg_sender
             }
@@ -119,7 +127,7 @@ def withdraw():
         }
     )
     bal_eth = w3.fromWei(bal_wei,'ether')
-    st.write(f"Your current balance is {bal_eth} ETH")
+    st.sidebar.markdown(f"## Your current balance is {bal_eth} ETH")
     num_eth = input_ETH(float(bal_eth))
 
     if st.button('Submit'):
@@ -142,7 +150,7 @@ def withdraw():
 def apply_loan():
     loan_amount = get_loan_amount()
     if loan_amount != 0:
-        st.write("Account already has loan. Go to Renew function.")
+        st.error("Account already has loan. Go to Renew function.")
         return
     
     allowance = input_ETH()
@@ -156,17 +164,18 @@ def apply_loan():
     if loan_uri != None:
         if cash_loan(allowance):
             register_loan(loan_uri, tenor)
+        display_loan_details(loan_uri)
 
 def repay_loan():
     loan_amount = get_loan_amount()
     if loan_amount == 0:
-        st.write("Account has no loan")
+        st.error("Account has no loan")
         return
     
     loan_id = acc_contract.functions.get_loan_id().call( {"from": msg_sender} )
-    start_date_str, tenor, loan_details = get_loan_details(loan_id)
+    start_date_str, tenor, loan_uri = get_loan_details(loan_id)
     if  start_date_str == None:
-        st.write("Account has no loan")
+        st.error("Account has no loan")
         return
     
     start_date = datetime.date.fromisoformat(start_date_str)
@@ -174,12 +183,14 @@ def repay_loan():
     interest_rate = acc_contract.functions.get_rate().call()
 
     eth = input_ETH()
-    passed_days = 1
+    passed_days = 10
     total_interest = eth * interest_rate * passed_days / 365000
-    st.markdown(f"## Repay - Loan Amount: {loan_amount} ETH")
-    st.markdown(f"borrowed for: {passed_days} days")
-    st.markdown(f"at annual rate: {interest_rate / 10}%")
-    st.markdown(f"Total Interest to pay: {total_interest} ETH")
+    st.sidebar.markdown(f"## Repay - Loan Amount: {loan_amount} ETH")
+    st.sidebar.markdown(f"## borrowed for: {passed_days} days")
+    st.sidebar.markdown(f"## at annual rate: {interest_rate / 10}%")
+    st.sidebar.markdown(f"## Total Interest to pay: {total_interest} ETH")
+
+    display_loan_details(loan_uri)
 
     if st.button('Submit'): 
         try:
@@ -188,7 +199,7 @@ def repay_loan():
                     "value": w3.toWei(eth,'ether'), 
                     "gas":100000 })
         except ValueError as e:
-            st.write(ast.literal_eval(str(e))['message'])
+            st.error(ast.literal_eval(str(e))['message'])
             return
         receipt = w3.eth.waitForTransactionReceipt(tx_hash)
         st.write(receipt)
@@ -203,15 +214,16 @@ def repay_loan():
 
 def renew_loan():
     loan_id = acc_contract.functions.get_loan_id().call( {"from": msg_sender} )
-    start_date_str, tenor, loan_details = get_loan_details(loan_id)
+    start_date_str, tenor, loan_uri = get_loan_details(loan_id)
     if start_date_str == None:
-        st.write("Account has no loan")
+        st.error("Account has no loan")
         return
 
     old_amount = get_loan_amount()
-    st.markdown(f"## Renew - Loan Amount: {old_amount} ETH")
-    st.markdown(f"## Tenor: {tenor} days")
-    st.markdown(f"## Start Date: {start_date_str}")
+    st.sidebar.markdown(f"## Renew - Loan Amount: {old_amount} ETH")
+    st.sidebar.markdown(f"## Tenor: {tenor} days")
+    st.sidebar.markdown(f"## Start Date: {start_date_str}")
+    loan_details = display_loan_details(loan_uri)
 
     allowance = int(input_ETH())
     allowance_in_cad = round(allowance*get_CADR(),2)
@@ -227,7 +239,7 @@ def renew_loan():
     passed_days = (datetime.date.today() - start_date).days
     interest_rate = acc_contract.functions.get_rate().call()
 
-    passed_days = 1
+    passed_days = 10
     if allowance >= old_amount:
         total_interest = old_amount * interest_rate * passed_days / 365000
     else:
@@ -236,9 +248,10 @@ def renew_loan():
     if allowance > old_amount and not cash_loan(allowance-old_amount):
         return
     
-    st.markdown(f"borrowed for: {passed_days} days")
-    st.markdown(f"at annual rate: {interest_rate / 10}%")
-    st.markdown(f"Total Interest to pay: {total_interest} ETH")
+    st.markdown(f"## borrowed for: {passed_days} days")
+    st.markdown(f"## at annual rate: {interest_rate / 10}%")
+    st.markdown(f"## Total Interest to pay: {total_interest} ETH")
+    display_loan_details(loan_uri)
 
     update_loan(loan_id, tenor, loan_uri)
     if total_interest > 0:
@@ -254,20 +267,23 @@ def renew_loan():
 def request_interest():
     earned_interest = acc_contract.functions.current_interest().call()
     st.markdown(f"## Earned Interest: {earned_interest}")
+
+    if earned_interest == 0:
+        return
+    
     if st.button('Submit'):
         try:
             tx_hash = acc_contract.functions.cash_interest(w3.toWei(earned_interest,'ether')).transact(
                 { "from": msg_sender,
                 "gas":100000})
         except ValueError as e:
-            st.write(ast.literal_eval(str(e))['message'])
+            st.error(ast.literal_eval(str(e))['message'])
             return
         receipt = w3.eth.waitForTransactionReceipt(tx_hash)
         st.write(receipt) 
 
 def collector():
-    st.write("### Get and show current commission rate from the Interest contract is 0.1")
-    st.markdown("## list delinquent loans to select see/pay")
+    expose_delinquents()
 
 funcs = {   "Deposit": deposit,
             "Withdraw": withdraw,

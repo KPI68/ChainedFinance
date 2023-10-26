@@ -102,7 +102,8 @@ def loan_appraisal(account_address, loan_amount_cad, loan_term_days):
             'outstanding_debt': outstanding_debt
         }
         if ml_decision(loan_amount_cad, loan_term_days, loan_details):
-            st.write("Loan Approved")
+            st.markdown("## Loan Approved")
+            st.balloons()
 
             try:
                 loan_ipfs_hash, token_json = pin_loan_data(account_address, loan_details, file)
@@ -110,10 +111,11 @@ def loan_appraisal(account_address, loan_amount_cad, loan_term_days):
                 st.markdown(f"[Loan details Link](https://ipfs.io/ipfs/{loan_ipfs_hash})")
                 return loan_uri
             except AttributeError:
-                st.write("file null")
+                st.error("file null")
                 return None
         else:
-            st.write("Loan Declined")
+            st.error("Loan Declined")
+            st.snow()
             return None
 
 def loan_renewal(account_address, loan_amount_cad, loan_term_days, details, img_hash):
@@ -172,13 +174,15 @@ def loan_renewal(account_address, loan_amount_cad, loan_term_days, details, img_
         loan_details['outstanding_debt'] = outstanding_debt
     
         if ml_decision(loan_amount_cad, loan_term_days, loan_details):
-            st.write("Loan Approved")
+            st.markdown("## Loan Approved")
+            st.balloons()
 
             loan_ipfs_hash, token_json = pin_loan_data(account_address, loan_details, None, img_hash)
             loan_uri = f"ipfs://{loan_ipfs_hash}"
             st.markdown(f"[Loan details Link](https://ipfs.io/ipfs/{loan_ipfs_hash})")
             return loan_uri
         else:
-            st.write("Loan Declined")
+            st.error("Loan Declined")
+            st.snow()
             return None
 
