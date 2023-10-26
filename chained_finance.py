@@ -188,7 +188,7 @@ def repay_loan():
     st.sidebar.markdown(f"## Repay - Loan Amount: {loan_amount} ETH")
     st.sidebar.markdown(f"## borrowed for: {passed_days} days")
     st.sidebar.markdown(f"## at annual rate: {interest_rate / 10}%")
-    st.sidebar.markdown(f"## Total Interest to pay: {total_interest} ETH")
+    st.sidebar.markdown(f"## Total Interest to pay: {total_interest} ETH ({total_interest*get_CADR()} CAD)")
 
     display_loan_details(loan_uri)
 
@@ -250,7 +250,7 @@ def renew_loan():
     
     st.markdown(f"## borrowed for: {passed_days} days")
     st.markdown(f"## at annual rate: {interest_rate / 10}%")
-    st.markdown(f"## Total Interest to pay: {total_interest} ETH")
+    st.markdown(f"## Total Interest to pay: {total_interest} ETH ({total_interest*get_CADR} CAD)")
     display_loan_details(loan_uri)
 
     update_loan(loan_id, tenor, loan_uri)
@@ -265,8 +265,8 @@ def renew_loan():
         
     
 def request_interest():
-    earned_interest = acc_contract.functions.current_interest().call()
-    st.markdown(f"## Earned Interest: {earned_interest}")
+    earned_interest = float(w3.fromWei(acc_contract.functions.current_interest().call(),'ether'))
+    st.markdown(f"## Earned Interest: {earned_interest} ({earned_interest*get_CADR()} CAD)")
 
     if earned_interest == 0:
         return
