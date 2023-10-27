@@ -89,5 +89,30 @@ Feel free to explore the application and experiment with different financial ope
 
 **Expected Outcome:** The application should create a loan based on the specified allowance and tenure given the machine learning model approves the client for a loan. You should see a the loan amount approved in ether and a loan details link that will display the details of the client.
 
+4. **Repay a Loan:**
 
+* Select your ethereum account address.
+* Select the "Repay Loan" function from the dropdown.
+* The application will automatically display your loan details.
+* Enter the amount of Ether you want to repay in the "Number of ETH" field.
+* Click the "Submit" button.
 
+**Expected Outcome:** The application should accept the repayment, update your loan status, and record the interest paid.
+
+5. **Renew a Loan:**
+
+* Select your ethereum account address.
+* Select the "Renew Loan" function from the dropdown.
+* The application will automatically display your loan details.
+* Enter the new allowance in Ether in the "Number of ETH" field.
+* Adjust the tenure by moving the slider.
+* Click the "Submit" button.
+
+**Expected Outcome:** The application should renew your loan with the new allowance and tenure. You should see a transaction receipt, and your loan details should be updated.
+
+6. **Collector:**
+
+* Select the "Collector" function from the dropdown.
+The application should display the current commission rate and allow you to list delinquent loans.
+
+**Expected Outcome:** The application should display the commission rate and provide options to view and take action on delinquent loans.
