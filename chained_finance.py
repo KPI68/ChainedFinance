@@ -217,7 +217,7 @@ def repay_loan():
     eth = input_ETH()
     passed_days = 10
     total_interest = eth * interest_rate * passed_days / 365000
-    print("repay", type(total_interest), get_CADR())
+    
     st.sidebar.markdown(f"## Repay - Loan Amount: {loan_amount} ETH")
     st.sidebar.markdown(f"## borrowed for: {passed_days} days")
     st.sidebar.markdown(f"## at annual rate: {interest_rate / 10}%")
@@ -236,9 +236,23 @@ def renew_loan():
         return
 
     old_amount = get_loan_amount()
+    if old_amount == 0:
+        st.error("Account has no loan")
+        return
+    
     st.sidebar.markdown(f"## Renew - Loan Amount: {old_amount} ETH")
     st.sidebar.markdown(f"## Tenor: {tenor} days")
     st.sidebar.markdown(f"## Start Date: {start_date_str}")
+    start_date = datetime.date.fromisoformat(start_date_str)
+    passed_days = (datetime.date.today() - start_date).days
+    interest_rate = acc_contract.functions.get_rate().call()
+
+    #passed_days = 10
+    total_interest = old_amount * interest_rate * passed_days / 365000
+    st.sidebar.markdown(f"## borrowed for: {passed_days} days")
+    st.sidebar.markdown(f"## at annual rate: {interest_rate / 10}%")
+    st.sidebar.markdown(f"## Total Interest to pay: {total_interest} ETH ({total_interest*get_CADR()} CAD)")
+    
     loan_details = display_loan_details(loan_uri)
 
     allowance = int(input_ETH())
@@ -251,13 +265,6 @@ def renew_loan():
     
     tx_hash = loan_contract.functions.updateLoan(loan_id, str(datetime.date.today()), tenor, loan_uri).transact({'from': msg_sender, 'gas': 1000000})
     
-    start_date = datetime.date.fromisoformat(start_date_str)
-    passed_days = (datetime.date.today() - start_date).days
-    interest_rate = acc_contract.functions.get_rate().call()
-
-    passed_days = 10
-    total_interest = old_amount * interest_rate * passed_days / 365000
-
     if allowance > old_amount and not cash_loan(allowance-old_amount):
         return
     
@@ -283,6 +290,13 @@ def renew_loan():
         
     
 def request_interest():
+    bal_wei = acc_contract.functions.current_cash().call(
+        {   "from": msg_sender
+        }
+    )
+    bal_eth = w3.fromWei(bal_wei,'ether')
+    st.sidebar.markdown(f"## Your current balance is {bal_eth} ETH")
+
     earned_interest = float(w3.fromWei(acc_contract.functions.current_interest().call(),'ether'))
     st.markdown(f"## Earned Interest: {earned_interest} ({earned_interest*get_CADR()} CAD)")
 
