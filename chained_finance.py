@@ -297,7 +297,10 @@ def request_interest():
     bal_eth = w3.fromWei(bal_wei,'ether')
     st.sidebar.markdown(f"## Your current balance is {bal_eth} ETH")
 
-    earned_interest = float(w3.fromWei(acc_contract.functions.current_interest().call(),'ether'))
+    earned_interest = float(w3.fromWei(acc_contract.functions.current_interest().call(
+         {   "from": msg_sender
+        }
+    ),'ether'))
     st.markdown(f"## Earned Interest: {earned_interest} ({earned_interest*get_CADR()} CAD)")
 
     if earned_interest == 0:
